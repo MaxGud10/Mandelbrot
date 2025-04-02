@@ -1,5 +1,5 @@
-*.cpp diff=cp1251 text eol=lf
-*.h diff=cp1251 text eol=lf
+src/*.cpp diff=cp1251 text eol=lf
+include/*.h diff=cp1251 text eol=lf
 *.txt diff=cp1251 text eol=lf
 *.md diff=utf-8 text eol=lf
 Makefile diff=utf-8 text eol=lf
