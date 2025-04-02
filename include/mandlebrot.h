@@ -5,6 +5,8 @@
 #include "stdlib.h"
 #include <x86intrin.h>
 
+#include <omp.h> // TODO убрать 
+
 
 #define RUN_TEST(FUNC)                                                       \
     uint64_t start_ticks = __rdtsc ();                                       \
@@ -16,10 +18,16 @@
     printf ("CPU ticks = %ld \n", (end_ticks - start_ticks) / ITERATIONS);   \
 
 
-const int    WIDTH          = 800;
-const int    HEIGHT         = 600;
-const int    VECTOR_SIZE    = 8;
-const size_t ITERATIONS     = 80;
+    const int   MAX_ITERATIONS = 256;
+    const float MAX_RADIUS     = 100.f;
+    const int   WIDTH          = 800;
+    const int   HEIGHT         = 600;
+    const float D_X            = 1 / (float)WIDTH;
+    const float D_Y            = 1 / (float)WIDTH;
+    const float HALF_WIDTH     = (float)WIDTH  / 2;
+    const float HALF_HEIGHT    = (float)HEIGHT / 2;
+    const int   VECTOR_SIZE    = 8;
+    const size_t ITERATIONS    = 80;
 
 enum Mode 
 {
@@ -43,6 +51,7 @@ void        init_mandelbrot       (struct MandelBrot* set);
 
 void        mandelbrot_naive      (struct MandelBrot* set);
 void        mandelbrot_vectorized (struct MandelBrot* set); 
+void        mandelbrot_simd       (struct MandelBrot* set);
 
 void        run_performance_test  (struct MandelBrot* set);
 
