@@ -1,18 +1,11 @@
-//#define DEBUG
-
 #include "../include/mandlebrot.h"
 
-#ifdef DEBUG
-    #define DBG(...) __VA_ARGS__
-#else
-    #define DBG(...)
-#endif
 
 void init_mandelbrot (struct MandelBrot* set) 
 {
-    set->scale        =  3.0f;
-    set->x_offset     = -0.1f;
-    set->y_offset     =  0.f ;
+    set->scale        =  INITIAL_SCALE;
+    set->x_offset     =  INITIAL_X_OFFSET;
+    set->y_offset     =  INITIAL_Y_OFFSET ;
     set->pixels_array = (uint32_t*) calloc (HEIGHT * WIDTH, sizeof(uint32_t));
 
     DBG( printf("Allocated pixels array: %p\n", (void*)set->pixels_array);           )
@@ -261,25 +254,25 @@ void mandelbrot_simd (struct MandelBrot* set)
     }
 }
 
-void run_performance_test (struct MandelBrot* set) 
+void run_performance_test (struct MandelBrot* set, int mode_measure) 
 {
     switch (set->mode) 
     {
         case BY_PIXELS: 
         {
-            RUN_TEST (mandelbrot_naive);  
+            RUN_TEST(mandelbrot_naive, mode_measure);  
             break;
         }
 
         case BY_VECTOR:
         {
-            RUN_TEST (mandelbrot_vectorized); 
+            RUN_TEST (mandelbrot_vectorized, mode_measure); 
             break;
         }
 
         case BY_SIMD:
         {   
-            RUN_TEST (mandelbrot_simd );   
+            RUN_TEST (mandelbrot_simd, mode_measure);   
             break;
         }
 
@@ -291,13 +284,10 @@ void run_performance_test (struct MandelBrot* set)
 inline void get_pixels (struct MandelBrot* set,  size_t index, size_t count)
 {
     if (count != MAX_ITERATIONS)
-    {
-        count *= 100;
-        set->pixels_array[index] = 0xFF | count << 24 | count << 16 | count << 8;
-    }
+        set->pixels_array[index] = 0xFFFF00FF - (count * 3) << 2; // TODO in const
 
     else
-        set->pixels_array[index] = 0xFF000000;
+        set->pixels_array[index] = DEFAULT_COLOR;
 
     // TODO после отладки убрать эту проверку 
     if (index < 10) 
@@ -314,19 +304,19 @@ inline int handle_keyboard_input (struct MandelBrot* set, sf::Event &event)
     {
         switch (event.key.code)
         {            
-            case sf::Keyboard::Key::Right:  set->x_offset   += 0.05f; break;
+            case sf::Keyboard::Key::Right:  set->x_offset   += MOVE_SPEED;      break;
 
-            case sf::Keyboard::Key::Left:   set->x_offset   -= 0.05f; break;
+            case sf::Keyboard::Key::Left:   set->x_offset   -= MOVE_SPEED;      break;
 
-            case sf::Keyboard::Key::Up:     set->y_offset   -= 0.05f; break;
+            case sf::Keyboard::Key::Up:     set->y_offset   -= MOVE_SPEED;      break;
 
-            case sf::Keyboard::Key::Down:   set->y_offset   += 0.05f; break;
+            case sf::Keyboard::Key::Down:   set->y_offset   += MOVE_SPEED;      break;
 
-            case sf::Keyboard::Key::Hyphen: set->scale      *= 1.25f; break;
+            case sf::Keyboard::Key::Hyphen: set->scale      *= ZOOM_IN_FACTOR;  break;
 
-            case sf::Keyboard::Key::Equal:  set->scale      *= 0.8f;  break;
+            case sf::Keyboard::Key::Equal:  set->scale      *= ZOOM_OUT_FACTOR; break;
 
-            default:                                                  break;
+            default:                                                            break;
         }
     }
 
@@ -379,4 +369,26 @@ inline void get_fps (sf::Clock &clock, sf::Text &text, struct MandelBrot* set)
     sprintf (buffer, "FPS: %.2f", 1.f / elapsed_time.asSeconds ());
 
     text.setString (buffer);
+}
+
+void dtor_mandlebrot (struct MandelBrot* set)
+{
+    if (!set) 
+    {
+        fprintf (stderr, "\nset == NULL\n"); // TODO сдеалть макросом 
+        return;
+    }    
+
+    set->scale    = 0.0f;
+    set->x_offset = 0.0f;
+    set->y_offset = 0.0f;
+
+    if (set->pixels_array != NULL) 
+    {
+        free(set->pixels_array);
+
+        set->pixels_array = NULL;  
+
+        DBG (printf("Freed pixels array\n"); ) 
+    }
 }
