@@ -9,7 +9,6 @@
 
 #include <omp.h> // TODO убрать 
 
-
 #define RUN_TEST(FUNC, mode)                                                        \
     if (mode == 1)                                                                  \
         {                                                                           \
@@ -63,6 +62,8 @@ const float INITIAL_SCALE     = 3.0f;       // начальный масштаб
 const float INITIAL_X_OFFSET  = -0.1f;      // начальное смещение по X
 const float INITIAL_Y_OFFSET  = 0.0f;       // начальное смещение по Y
 
+typedef struct MandelBrot MandelBrot_t;
+
 enum Mode 
 {
     BY_PIXELS  =  1,
@@ -81,27 +82,27 @@ struct MandelBrot
     uint32_t* pixels_array;
 };
 
-void        init_mandelbrot       (struct MandelBrot* set); 
-void        dtor_mandlebrot       (struct MandelBrot* set);
+void        init_mandelbrot       (MandelBrot_t* set); 
+void        dtor_mandlebrot       (MandelBrot_t* set);
 
-void        mandelbrot_naive      (struct MandelBrot* set);
-void        mandelbrot_vectorized (struct MandelBrot* set); 
-void        mandelbrot_simd       (struct MandelBrot* set);
+void        mandelbrot_naive      (MandelBrot_t* set);
+void        mandelbrot_vectorized (MandelBrot_t* set); 
+void        mandelbrot_simd       (MandelBrot_t* set);
 
-void        run_performance_test  (struct MandelBrot* set, int mode_measure);
+void        run_performance_test  (MandelBrot_t* set, int mode_measure);
 
-inline void get_pixels            (struct MandelBrot* set, size_t index, size_t count);
-inline void get_fps               (sf::Clock &clock, sf::Text &text, struct MandelBrot* set);
-inline  int handle_keyboard_input (struct MandelBrot* set, sf::Event &event); 
+inline void get_pixels            (MandelBrot_t* set, size_t index, size_t count);
+inline void get_fps               (sf::Clock &clock, sf::Text &text, MandelBrot_t* set);
+inline  int handle_keyboard_input (MandelBrot_t* set, sf::Event &event); 
 
-void        get_mandel_brot_set   (struct MandelBrot* set);
+void        get_mandel_brot_set   (MandelBrot_t* set);
 
 
 
 // TODO сделвть редми. прям как лаба (что хотел тоха конкретно уточнить в записях)
 // TODO исправить русский -> gitatrid.
 // TODO разделить на файлы
-// TODO мб сделать typdef fot struct
+///// TODO мб сделать typdef fot struct
 ///// TODO сделать больше констант 
 ///// TODO поменять NDEBUG и вынести в .h 
 
