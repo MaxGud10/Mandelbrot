@@ -1,19 +1,36 @@
 #include "../include/mandlebrot.h"
 
 
-void init_mandelbrot (struct MandelBrot* set) 
+void init_mandelbrot (MandelBrot_t* set) 
 {
     set->scale        =  INITIAL_SCALE;
     set->x_offset     =  INITIAL_X_OFFSET;
     set->y_offset     =  INITIAL_Y_OFFSET ;
     set->pixels_array = (uint32_t*) calloc (HEIGHT * WIDTH, sizeof(uint32_t));
 
-    DBG( printf("Allocated pixels array: %p\n", (void*)set->pixels_array);           )
-    DBG( printf("Memory allocated: %lu bytes\n", HEIGHT * WIDTH * sizeof(uint32_t)); )
+    //init_color_palette(set); // [x] ?? 
+
+    switch(set->mode) 
+    {
+        case BY_PIXELS:  set->calculate = mandelbrot_naive;      /*printf ( "\n[%s] set->calculate = %p\n", __func__, set->calculate);*/ break;
+
+        case BY_VECTOR:  set->calculate = mandelbrot_vectorized; /*printf ( "\n[%s] set->calculate = %p\n", __func__, set->calculate);*/  break;
+
+        case BY_SIMD:    set->calculate = mandelbrot_simd;       break;
+
+        default:         printf ("\nERROR: Invalid mode\n");     break;
+    }
+
+    // DBG( printf("Allocated pixels array: %p\n", (void*)set->pixels_array);           )
+    // DBG( printf("Memory allocated: %lu bytes\n", HEIGHT * WIDTH * sizeof(uint32_t)); )
 }
 
-void get_mandel_brot_set (struct MandelBrot* set)
+void get_mandel_brot_set (MandelBrot_t* set)
 {
+    // printf ("\nSTRART IN TO get_mandel_brot_set\n");
+    // printf("[%s] Selected mode: %d | calculate ptr: %p\n", 
+    //     __func__, set->mode, (void*)set->calculate);
+
     sf::RenderWindow window (sf::VideoMode(WIDTH, HEIGHT), "Mandelbrot Set");
 
     sf::Image image;
@@ -49,7 +66,7 @@ void get_mandel_brot_set (struct MandelBrot* set)
             handle_keyboard_input (set, event);
         }
 
-        DBG( printf("Calculating FPS...\n"); )
+        //DBG( printf("Calculating FPS...\n"); )
         get_fps (clock, text, set);
 
         texture.update ((sf::Uint8*) set->pixels_array, WIDTH, HEIGHT, 0, 0);
@@ -61,19 +78,21 @@ void get_mandel_brot_set (struct MandelBrot* set)
 }
 
 
-void mandelbrot_naive (struct MandelBrot* set)
+void mandelbrot_naive (MandelBrot_t* set)
 {
-    DBG( printf("Running naive Mandelbrot algorithm\n"); )
+    //DBG( printf("Running naive Mandelbrot algorithm\n"); )
 
     const float real_dx = set->scale * D_X;
-    DBG( printf("Real dx: %f\n", real_dx); )
+    //DBG( printf("Real dx: %f\n", real_dx); )
     // set->scale - масштаб (увеличение/уменьшение)
     // 1 / WIDTH — нормировка на ширину экрана (перевод из пикселей в координаты [-1.5, 1.5]
     // real_dx - шаг по оси x в комлексной плоскости
 
+    // параллелизация по строкам (y)
+    #pragma omp parallel for schedule(dynamic)
     for (size_t y = 0; y < HEIGHT; y++)
     {
-        float x0 = (-(HALF_WIDTH)            * D_X + set->x_offset) * set->scale;
+        float x0 = (-(HALF_WIDTH)            * D_X + set->x_offset) * set->scale;  // ПОПРОбОВАТЬ DOUBLE
         float y0 = (((float)y - HALF_HEIGHT) * D_Y + set->y_offset) * set->scale;
 
         for (size_t x = 0; x < WIDTH; x++, x0 += real_dx)
@@ -89,13 +108,7 @@ void mandelbrot_naive (struct MandelBrot* set)
                 float y2 = y_n * y_n;
                 float xy = x_n * y_n;
 
-                if (x2 + y2 >= MAX_RADIUS) 
-                {
-                    if (x == 0 && y == 0) 
-                        printf("First point diverged at iteration %zu\n", count); 
-
-                    break;
-                }
+                if ((x2 + y2) >= MAX_RADIUS) break;
 
                 x_n = x2 - y2 + x0;
                 y_n = xy + xy + y0;
@@ -104,17 +117,16 @@ void mandelbrot_naive (struct MandelBrot* set)
             get_pixels (set, y * WIDTH + x, count - 1);
         }
     }
-    
-    DBG( printf("Naive algorithm completed\n"); )
+    //DBG( printf("Naive algorithm completed\n"); )
 }
 
-
-void mandelbrot_vectorized (struct MandelBrot* set)
+void mandelbrot_vectorized (MandelBrot_t* set)
 {
-    DBG( printf("Running vectorized Mandelbrot algorithm\n");)
+    //DBG( printf("Running vectorized Mandelbrot algorithm\n");)
 
     const float real_dx = set->scale * D_X;
 
+    #pragma omp parallel for schedule(dynamic)
     for (size_t y = 0; y < HEIGHT; y++) 
     {
         float x0 = (-(HALF_WIDTH)            * D_X + set->x_offset) * set->scale;
@@ -167,7 +179,7 @@ void mandelbrot_vectorized (struct MandelBrot* set)
                 if (!mask) 
                 {
                     if (x == 0 && y == 0) 
-                        DBG( printf("First block converged after %d iterations\n", count); )
+                        //DBG( printf("First block converged after %d iterations\n", count); )
 
                     break;
                 }
@@ -183,16 +195,27 @@ void mandelbrot_vectorized (struct MandelBrot* set)
                 }
             }
 
-                for (size_t i = 0; i < VECTOR_SIZE; i++) 
-                    get_pixels (set, y * WIDTH + x + i, real_count[i]);
+                // for (size_t i = 0; i < VECTOR_SIZE; i++) 
+                //     get_pixels (set, y * WIDTH + x + i, real_count[i]);
+                #pragma omp critical // [x] ??? почитать нужен ли здесь 
+                {
+                    for (size_t i = 0; i < VECTOR_SIZE; i++) 
+                        get_pixels(set, y * WIDTH + x + i, real_count[i]);
+                }
         }
     }
 
-    DBG (printf("Vectorized algorithm completed\n"); )
+    //DBG (printf("Vectorized algorithm completed\n"); )
 }
+// TODO посмотреть про выравливания (в брайне хлор). посмотреть как быстро или не быстро. обязательно выравлнить calloc -> aligncalloc где нужно, где не нужно где быстрее ил медленне
+// -o3 -o0, on off Asan, 3 version, Vector_size - фпс зависимость от 2^n размера, openMd, align memory, compilers, gcc 9-13-14, clang 10-19, double-float
+// останавливать fps э
+// [x]-S - флаг который генерит asm файл (o0 and 03)
 
 
-void mandelbrot_simd (struct MandelBrot* set) 
+
+
+void mandelbrot_simd (MandelBrot_t* set) 
 {
     DBG( printf("Running SIMD Mandelbrot algorithm\n"); )
 
@@ -204,6 +227,7 @@ void mandelbrot_simd (struct MandelBrot* set)
     __m256 MUL_OFFSET = _mm256_set_ps (7, 6, 5, 4, 3, 2, 1, 0);
     DX = _mm256_mul_ps (DX, MUL_OFFSET);      // [7*dx, 6*dx, ..., 1*dx, 0*dx] - вычисляем начальные координаты для 8 точек
 
+    #pragma omp parallel for schedule(dynamic)
     for (size_t y = 0; y < HEIGHT; y++)
     {
         float x_0 = (-(HALF_WIDTH)            * D_X + set->x_offset) * set->scale;
@@ -254,51 +278,41 @@ void mandelbrot_simd (struct MandelBrot* set)
     }
 }
 
-void run_performance_test (struct MandelBrot* set, int mode_measure) 
+void run_performance_test (MandelBrot_t* set, int mode_measure) 
 {
-    switch (set->mode) 
-    {
-        case BY_PIXELS: 
-        {
-            RUN_TEST(mandelbrot_naive, mode_measure);  
-            break;
-        }
-
-        case BY_VECTOR:
-        {
-            RUN_TEST (mandelbrot_vectorized, mode_measure); 
-            break;
-        }
-
-        case BY_SIMD:
-        {   
-            RUN_TEST (mandelbrot_simd, mode_measure);   
-            break;
-        }
-
-        default:        
-            break;
+    if (!set->calculate) {
+        printf("Error: Calculation function not initialized\n");
+        return;
     }
-}
 
-inline void get_pixels (struct MandelBrot* set,  size_t index, size_t count)
-{
-    if (count != MAX_ITERATIONS)
-        set->pixels_array[index] = 0xFFFF00FF - (count * 3) << 2; // TODO in const
+    RUN_TEST(set->calculate, mode_measure);
+    // switch (set->mode) 
+    // {
+    //     case BY_PIXELS: 
+    //     {
+    //         RUN_TEST(mandelbrot_naive, mode_measure);  
+    //         break;
+    //     }
 
-    else
-        set->pixels_array[index] = DEFAULT_COLOR;
+    //     case BY_VECTOR:
+    //     {
+    //         RUN_TEST (mandelbrot_vectorized, mode_measure); 
+    //         break;
+    //     }
 
-    // TODO после отладки убрать эту проверку 
-    if (index < 10) 
-    {
-        DBG( printf("Pixel %zu: count = %zu, color = 0x%08X\n", 
-                     index,     count,       set->pixels_array[index]); )
-    }
+    //     case BY_SIMD:
+    //     {   
+    //         RUN_TEST (mandelbrot_simd, mode_measure);   
+    //         break;
+    //     }
+
+    //     default:        
+    //         break;
+    // }
 }
 
 
-inline int handle_keyboard_input (struct MandelBrot* set, sf::Event &event) 
+int handle_keyboard_input (MandelBrot_t* set, sf::Event &event) 
 {
     if (event.type == sf::Event::KeyPressed)
     {
@@ -323,55 +337,7 @@ inline int handle_keyboard_input (struct MandelBrot* set, sf::Event &event)
     return 0;
 }
 
-
-inline void get_fps (sf::Clock &clock, sf::Text &text, struct MandelBrot* set) 
-{
-    DBG( printf("Starting FPS calculation for mode: "); )
-    switch (set->mode)
-    {
-        case BY_PIXELS: 
-        {
-            DBG( printf("Naive\n"); )
-
-            clock.restart();
-            mandelbrot_naive(set);
-            break;
-        }
-
-        case BY_VECTOR:
-        {
-            DBG( printf("Vectorized\n"); )
-
-            clock.restart();
-            mandelbrot_vectorized(set);
-            break;
-        }    
-
-        case BY_SIMD:
-        { 
-            DBG( printf("SIMD\n"); )
-
-            clock.restart();
-            mandelbrot_simd(set);
-            break;
-        }
-
-        default:      
-            printf("DEDLOH: Unknown\n");          
-
-            break;
-    }
-
-    sf::Time elapsed_time = clock.getElapsedTime();
-
-    char buffer[16] = {};
-
-    sprintf (buffer, "FPS: %.2f", 1.f / elapsed_time.asSeconds ());
-
-    text.setString (buffer);
-}
-
-void dtor_mandlebrot (struct MandelBrot* set)
+void dtor_mandlebrot (MandelBrot_t* set)
 {
     if (!set) 
     {
@@ -392,3 +358,94 @@ void dtor_mandlebrot (struct MandelBrot* set)
         DBG (printf("Freed pixels array\n"); ) 
     }
 }
+
+
+// inline void get_pixels (MandelBrot_t* set,  size_t index, size_t count)
+void get_pixels (MandelBrot_t* set,  size_t index, size_t count)
+{
+    // if (count >= MAX_ITERATIONS) {
+    //     set->pixels_array[index] = set->color_palette[MAX_ITERATIONS-1];
+    // } else {
+    //     set->pixels_array[index] = set->color_palette[count];
+    // }
+    if (count != MAX_ITERATIONS)
+    {
+        set->pixels_array[index] = (0xFFFF00FF - (count * 3)) << 2; // TODO 0xFFFF00FF in const
+    }
+// [x] формула для красивого цвета через sin 
+// заранее вычислять цвета и передавать уде потом (можно в функции). присваивания с индексом  
+    else
+        set->pixels_array[index] = DEFAULT_COLOR;
+}
+
+void init_color_palette(MandelBrot_t* set) 
+{
+    set->color_palette = (uint32_t*)malloc(MAX_ITERATIONS * sizeof(uint32_t));
+    
+    for (size_t i = 0; i < MAX_ITERATIONS; i++) {
+        // Нормализация значения в диапазон [0, 1]
+        float normalized = (float)i / (float)MAX_ITERATIONS;
+        
+        // Используем тригонометрические функции для плавных переходов
+        float r = sinf (2 * M_PI * normalized * 1.5f + M_PI/3) * 0.5f + 0.5f;
+        float g = sinf (2 * M_PI * normalized * 2.0f + M_PI/2) * 0.5f + 0.5f;
+        float b = sinf (2 * M_PI * normalized * 3.0f + M_PI)   * 0.5f + 0.5f;
+        
+        // Преобразуем в цвет формата 0xAARRGGBB
+        set->color_palette[i] = 
+            (0xFF << 24) |                      // Альфа-канал
+            ((uint32_t)(r * 255) << 16) |       // Красный
+            ((uint32_t)(g * 255) << 8)  |       // Зеленый
+             (uint32_t)(b * 255);               // Синий
+    }
+    
+    // Цвет для точек внутри множества (черный)
+    set->color_palette[MAX_ITERATIONS-1] = DEFAULT_COLOR;
+}
+
+// inline void get_fps (sf::Clock &clock, sf::Text &text, MandelBrot_t* set) 
+void get_fps (sf::Clock &clock, sf::Text &text, MandelBrot_t* set) 
+{
+    if (!set->calculate) 
+    {
+        text.setString("Algorithm not initialized");
+        return;
+    }
+
+    uint64_t start = __rdtsc();
+    
+
+    //printf ("\nSET->CALCULATE = %p\n", set->calculate);
+    set->calculate(set);
+ 
+    // =================
+    // static bool first_run = true;  
+    
+    // if (first_run) 
+    // {
+    //     printf("[FPS] First run | calculate function: %p\n", (void*)set->calculate);
+    //     first_run = false;
+    // }
+
+    // if (!set->calculate) 
+    // {
+    //     text.setString("Algorithm not initialized");
+    //     return;
+    // }
+    
+    //====================
+
+    uint64_t       end =       __rdtsc();
+    sf::Time sfml_time = clock.restart();
+    
+    const double cpu_ghz = 2.5; 
+    double rdtsc_fps     = 1.0 / ((end - start) / (cpu_ghz * 1e9));
+
+    double sfml_fps = 1.0 / sfml_time.asSeconds();
+    
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "FPS: rdtsc %.2f | SFML %.2f", rdtsc_fps, sfml_fps);
+    text.setString(buffer);
+}
+
+
