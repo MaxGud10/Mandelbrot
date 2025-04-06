@@ -1,0 +1,3 @@
+src/mandelbrot_code.cpp
+src/mandelbrot_render.cpp
+src/mandelbrot_utils.cpp
