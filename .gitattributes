@@ -1,9 +1,14 @@
-src/*.cpp diff=cp1251 text eol=lf
-include/*.h diff=cp1251 text eol=lf
-*.txt diff=cp1251 text eol=lf
-*.md diff=utf-8 text eol=lf
-Makefile diff=utf-8 text eol=lf
-*.sln diff=astextplain eol=crlf
-*.vcxproj diff=astextplain eol=crlf
+# Настройки для C++ файлов с русскими комментариями (Windows-1251)
+src/*.cpp    text working-tree-encoding=Windows-1251 eol=CRLF
+inlude/*.h      text working-tree-encoding=Windows-1251 eol=CRLF
 
-*.md linguist-language=Markdown
+# Бинарные файлы (исключаем конвертацию)
+obj/*.exe    binary -text
+
+
+# Дополнительные настройки
+*.md     text working-tree-encoding=UTF-8
+
+# Игнорировать конвертацию для служебных файлов
+.gitattributes export-ignore
+.gitignore     export-ignore

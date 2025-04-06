@@ -1,13 +1,15 @@
 #pragma once
 
-//#define NDEBUG
+//#define DEBUG
 
 #include <SFML/Graphics.hpp>
 #include <immintrin.h>
 #include "stdlib.h"
+#include <string.h>
 #include <x86intrin.h>
+#include <math.h>
 
-#include <omp.h> // TODO убрать 
+#include <omp.h> 
 
 #define RUN_TEST(FUNC, mode)                                                        \
     if (mode == 1)                                                                  \
@@ -31,38 +33,45 @@
         printf("time = %f sec\n", clock.getElapsedTime().asSeconds() / ITERATIONS); \
         } 
 
-#ifdef NDEBUG
+#ifdef DEBUG 
     #define DBG(...) __VA_ARGS__
 #else
     #define DBG(...)
 #endif
 
+#define FOR_VEC for (size_t i = 0; i < VECTOR_SIZE; ++i)
+#define ALIGN alignas(32)  // 32 байта для AVX
+#define ALIGNMENT 32 
+
 //=== Rendering constants ===//
-const int   MAX_ITERATIONS = 256;               // максимальное число итераций для фрактала
-const float MAX_RADIUS     = 100.f;             // критерий расходимости (|z|^2 >= 100)
-const int   WIDTH          = 800;               // ширина окна
-const int   HEIGHT         = 600;               // высота окна 
-const float D_X            = 1 / (float)WIDTH;  // шаг по X в комплексной плоскости
-const float D_Y            = 1 / (float)WIDTH;  // шаг по Y
-const float HALF_WIDTH     = (float)WIDTH  / 2; // половина ширины
-const float HALF_HEIGHT    = (float)HEIGHT / 2; // половина высота
-const int   VECTOR_SIZE    = 8;                 // размер вектора для SIMD (AVX2 = 8 float)
-const size_t ITERATIONS    = 80;                // число тестов для замера производительности
+const int    MAX_ITERATIONS = 256;               // максимальное число итераций для фрактала
+const float  MAX_RADIUS     = 100.f;             // критерий расходимости (|z|^2 >= 100)
+const int    WIDTH          = 800;               // ширина окна
+const int    HEIGHT         = 600;               // высота окна 
+const float  D_X            = 1 / (float)WIDTH;  // шаг по X в комплексной плоскости
+const float  D_Y            = 1 / (float)WIDTH;  // шаг по Y
+const float  HALF_WIDTH     = (float)WIDTH  / 2; // половина ширины
+const float  HALF_HEIGHT    = (float)HEIGHT / 2; // половина высота
+const int    VECTOR_SIZE    = 32; // 32          // размер вектора для SIMD (AVX2 = 8 float)
+const size_t ITERATIONS     = 80;                // число тестов для замера производительности
 
 //=== Color options ===//
 const uint32_t DEFAULT_COLOR  = 0xFF000000; // чёрный (сходится)
 const uint32_t ESCAPE_COLOR   = 0xFFFFFFFF; // белый (расходится)
-const float    COLOR_SCALE    = 100.0f;     // [x]множитель для градиента
+const float    COLOR_SCALE    = 100.0f;     // множитель для градиента
 
 //=== Control Parameters ===//
 const float ZOOM_IN_FACTOR    = 1.25f;      // множитель увеличения (клавиша '+')
 const float ZOOM_OUT_FACTOR   = 0.8f;       // множитель уменьшения (клавиша '-') 
-const float MOVE_SPEED        = 0.05f;      // шаг смещения камеры
+const float MOVE_SPEED        = 0.01f;      // шаг смещения камеры
 const float INITIAL_SCALE     = 3.0f;       // начальный масштаб
 const float INITIAL_X_OFFSET  = -0.1f;      // начальное смещение по X
 const float INITIAL_Y_OFFSET  = 0.0f;       // начальное смещение по Y
 
 typedef struct MandelBrot MandelBrot_t;
+
+typedef void (*MandelbrotFuncPtr)(MandelBrot_t*);
+
 
 enum Mode 
 {
@@ -77,35 +86,34 @@ struct MandelBrot
     float x_offset;
     float y_offset;
 
-    Mode mode;
+    Mode              mode;
+    MandelbrotFuncPtr calculate;
 
     uint32_t* pixels_array;
+    uint32_t* color_palette; 
 };
 
 void        init_mandelbrot       (MandelBrot_t* set); 
 void        dtor_mandlebrot       (MandelBrot_t* set);
+int         handle_keyboard_input (MandelBrot_t* set, sf::Event &event); 
 
 void        mandelbrot_naive      (MandelBrot_t* set);
 void        mandelbrot_vectorized (MandelBrot_t* set); 
 void        mandelbrot_simd       (MandelBrot_t* set);
-
 void        run_performance_test  (MandelBrot_t* set, int mode_measure);
 
-inline void get_pixels            (MandelBrot_t* set, size_t index, size_t count);
-inline void get_fps               (sf::Clock &clock, sf::Text &text, MandelBrot_t* set);
-inline  int handle_keyboard_input (MandelBrot_t* set, sf::Event &event); 
-
 void        get_mandel_brot_set   (MandelBrot_t* set);
+void        get_pixels            (MandelBrot_t* set, size_t index, size_t count);
+void        get_fps               (sf::Clock &clock, sf::Text &text, MandelBrot_t* set);
+void init_color_palette           (MandelBrot_t* set);
 
 
-
-// TODO сделвть редми. прям как лаба (что хотел тоха конкретно уточнить в записях)
 // TODO исправить русский -> gitatrid.
 // TODO разделить на файлы
-///// TODO мб сделать typdef fot struct
-///// TODO сделать больше констант 
-///// TODO поменять NDEBUG и вынести в .h 
 
-// [x]  как сделаю написать новые туду 
-// TODO
-// 
+
+
+
+
+
+// TODO ПОДУМАТЬ ЧТО ХЕРНЯ С SFML. ПОЧЕМУ ОНА ТАК МЕДЛЕННО ОБРАБАТЫВАЕМ НАЖАТИЕ КНОПОК 
