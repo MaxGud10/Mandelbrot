@@ -73,9 +73,9 @@ void get_mandel_brot_set (MandelBrot_t* set)
 void mandelbrot_naive (MandelBrot_t* set)
 {
     const float real_dx = set->scale * D_X;
-    // set->scale - масштаб (увеличение/уменьшение)
-    // 1 / WIDTH — нормировка на ширину экрана (перевод из пикселей в координаты [-1.5, 1.5]
-    // real_dx - шаг по оси x в комлексной плоскости
+    // set->scale - РјР°СЃС€С‚Р°Р± (СѓРІРµР»РёС‡РµРЅРёРµ/СѓРјРµРЅСЊС€РµРЅРёРµ)
+    // 1 / WIDTH вЂ” РЅРѕСЂРјРёСЂРѕРІРєР° РЅР° С€РёСЂРёРЅСѓ СЌРєСЂР°РЅР° (РїРµСЂРµРІРѕРґ РёР· РїРёРєСЃРµР»РµР№ РІ РєРѕРѕСЂРґРёРЅР°С‚С‹ [-1.5, 1.5]
+    // real_dx - С€Р°Рі РїРѕ РѕСЃРё x РІ РєРѕРјР»РµРєСЃРЅРѕР№ РїР»РѕСЃРєРѕСЃС‚Рё
     
     for (size_t y = 0; y < HEIGHT; y++)
     {
@@ -145,7 +145,7 @@ void mandelbrot_vectorized(MandelBrot_t* set)
                     XY[i] = X_N[i] * Y_N[i];
                 }
 
-                // проверяем условие |z_n|^2 >= MAX_RADIUS
+                // РїСЂРѕРІРµСЂСЏРµРј СѓСЃР»РѕРІРёРµ |z_n|^2 >= MAX_RADIUS
                 ALIGN int active[VECTOR_SIZE] = {};
                 bool all_inactive = true;
                 
@@ -157,7 +157,7 @@ void mandelbrot_vectorized(MandelBrot_t* set)
 
                 if (all_inactive) break;
 
-                // обновляем только активные точки
+                // РѕР±РЅРѕРІР»СЏРµРј С‚РѕР»СЊРєРѕ Р°РєС‚РёРІРЅС‹Рµ С‚РѕС‡РєРё
                 FOR_VEC 
                 {
                     if (active[i]) 
@@ -180,7 +180,7 @@ void mandelbrot_vectorized(MandelBrot_t* set)
     }
 }
 
-// void mandelbrot_vectorized (MandelBrot_t* set) // [x] версия которая лучше рабоатет с VECTOR_SIZE = 32, но она без выравнивания
+// void mandelbrot_vectorized (MandelBrot_t* set) // [x] РІРµСЂСЃРёСЏ РєРѕС‚РѕСЂР°СЏ Р»СѓС‡С€Рµ СЂР°Р±РѕР°С‚РµС‚ СЃ VECTOR_SIZE = 32, РЅРѕ РѕРЅР° Р±РµР· РІС‹СЂР°РІРЅРёРІР°РЅРёСЏ
 // {
 //     const float real_dx = set->scale * D_X;
 
@@ -217,12 +217,12 @@ void mandelbrot_vectorized(MandelBrot_t* set)
 //                     XY[i] = X_N[i] * Y_N[i];
 //                 }
 
-//                 // проверяем условие |z_n|^2 >= 100
+//                 // РїСЂРѕРІРµСЂСЏРµРј СѓСЃР»РѕРІРёРµ |z_n|^2 >= 100
 //                 int cmp[VECTOR_SIZE] = {};
 //                 for (size_t i = 0; i < VECTOR_SIZE; i++)
 //                 {
 //                     if (X2[i] + Y2[i] <= MAX_RADIUS) 
-//                         cmp[i] = 1;                     // cmp[i] -> i-й бит mask
+//                         cmp[i] = 1;                     // cmp[i] -> i-Р№ Р±РёС‚ mask
 //                 }
 
 //                 int mask = 0;
@@ -231,7 +231,7 @@ void mandelbrot_vectorized(MandelBrot_t* set)
 
 //                 if (!mask) break;
 
-//                 // обновляем z_n 
+//                 // РѕР±РЅРѕРІР»СЏРµРј z_n 
 //                 for (size_t i = 0; i < VECTOR_SIZE; i++)
 //                 { 
 //                     real_count[i] += cmp[i];
@@ -247,10 +247,10 @@ void mandelbrot_vectorized(MandelBrot_t* set)
 //         }
 //     }
 // }
-// TODO посмотреть про выравливания (в брайне хлор). посмотреть как быстро или не быстро. обязательно выравлнить calloc -> aligncalloc где нужно, где не нужно где быстрее ил медленне
-// -o3 -o0, on off Asan, 3 version, Vector_size - фпс зависимость от 2^n размера, openMd, align memory, compilers, gcc 9-13-14, clang 10-19, double-float
-// останавливать fps э
-// [x]-S - флаг который генерит asm файл (o0 and 03)
+// TODO РїРѕСЃРјРѕС‚СЂРµС‚СЊ РїСЂРѕ РІС‹СЂР°РІР»РёРІР°РЅРёСЏ (РІ Р±СЂР°Р№РЅРµ С…Р»РѕСЂ). РїРѕСЃРјРѕС‚СЂРµС‚СЊ РєР°Рє Р±С‹СЃС‚СЂРѕ РёР»Рё РЅРµ Р±С‹СЃС‚СЂРѕ. РѕР±СЏР·Р°С‚РµР»СЊРЅРѕ РІС‹СЂР°РІР»РЅРёС‚СЊ calloc -> aligncalloc РіРґРµ РЅСѓР¶РЅРѕ, РіРґРµ РЅРµ РЅСѓР¶РЅРѕ РіРґРµ Р±С‹СЃС‚СЂРµРµ РёР» РјРµРґР»РµРЅРЅРµ
+// -o3 -o0, on off Asan, 3 version, Vector_size - С„РїСЃ Р·Р°РІРёСЃРёРјРѕСЃС‚СЊ РѕС‚ 2^n СЂР°Р·РјРµСЂР°, openMd, align memory, compilers, gcc 9-13-14, clang 10-19, double-float
+// РѕСЃС‚Р°РЅР°РІР»РёРІР°С‚СЊ fps СЌ
+// [x]-S - С„Р»Р°Рі РєРѕС‚РѕСЂС‹Р№ РіРµРЅРµСЂРёС‚ asm С„Р°Р№Р» (o0 and 03)
 
 void mandelbrot_simd(MandelBrot_t* set)
 {
@@ -286,7 +286,7 @@ void mandelbrot_simd(MandelBrot_t* set)
                     x0[i] = 0.0f;
                 }
 
-                __m256 X0 = _mm256_load_ps (x0);  // загружаем выровненные данные
+                __m256 X0 = _mm256_load_ps (x0);  // Р·Р°РіСЂСѓР¶Р°РµРј РІС‹СЂРѕРІРЅРµРЅРЅС‹Рµ РґР°РЅРЅС‹Рµ
                 __m256 Y0 = _mm256_set1_ps (y0);
 
                 __m256 X_N = X0;
@@ -329,16 +329,16 @@ void mandelbrot_simd(MandelBrot_t* set)
     }
 }
 
-
-// void mandelbrot_simd (MandelBrot_t* set) // [x] версия которая самая быстрая если VECTOR_SIZE = 8
+//TODO: VECTOR_SIZE for 2 Array version ONLY. For SIMD create another constant = 8
+// void mandelbrot_simd (MandelBrot_t* set) // [x] РІРµСЂСЃРёСЏ РєРѕС‚РѕСЂР°СЏ СЃР°РјР°СЏ Р±С‹СЃС‚СЂР°СЏ РµСЃР»Рё VECTOR_SIZE = 8
 // {
 //     float real_dx = D_X * set->scale;
 
-//     __m256 MaxRadius  = _mm256_set1_ps (MAX_RADIUS); // иницилизируем 8 элементов по 100
+//     __m256 MaxRadius  = _mm256_set1_ps (MAX_RADIUS); // РёРЅРёС†РёР»РёР·РёСЂСѓРµРј 8 СЌР»РµРјРµРЅС‚РѕРІ РїРѕ 100
 
 //     __m256 DX         = _mm256_set1_ps (real_dx);                       
 //     __m256 MUL_OFFSET = _mm256_set_ps (7, 6, 5, 4, 3, 2, 1, 0);
-//                    DX = _mm256_mul_ps (DX, MUL_OFFSET);      // [7*dx, 6*dx, ..., 1*dx, 0*dx] - вычисляем начальные координаты для 8 точек
+//                    DX = _mm256_mul_ps (DX, MUL_OFFSET);      // [7*dx, 6*dx, ..., 1*dx, 0*dx] - РІС‹С‡РёСЃР»СЏРµРј РЅР°С‡Р°Р»СЊРЅС‹Рµ РєРѕРѕСЂРґРёРЅР°С‚С‹ РґР»СЏ 8 С‚РѕС‡РµРє
 
 //     #pragma omp parallel for schedule(guided, 8)
 //     for (size_t y = 0; y < HEIGHT; y++)
@@ -369,11 +369,11 @@ void mandelbrot_simd(MandelBrot_t* set)
 
 //                 __m256 res = _mm256_cmp_ps (R2, MaxRadius, _CMP_LE_OS);
 
-//                 if (!_mm256_movemask_ps (res)) break; // преобразуем векторную маску в 8-битное число (по одному биту на элемент)
+//                 if (!_mm256_movemask_ps (res)) break; // РїСЂРµРѕР±СЂР°Р·СѓРµРј РІРµРєС‚РѕСЂРЅСѓСЋ РјР°СЃРєСѓ РІ 8-Р±РёС‚РЅРѕРµ С‡РёСЃР»Рѕ (РїРѕ РѕРґРЅРѕРјСѓ Р±РёС‚Сѓ РЅР° СЌР»РµРјРµРЅС‚)
 
-//                 __m256i temp = _mm256_castps_si256 (res);       // интерпретируем float-маску как целые
-//                         temp = _mm256_srli_epi32   (temp, 31);  // cдвигаеv каждый 32-битный элемент на 31 бит, оставляя только старший бит (0 или 1).
-//                 real_count   = _mm256_add_epi32    (real_count, temp);  // для точек которые еще не вышли добавляем 1 к счетчику
+//                 __m256i temp = _mm256_castps_si256 (res);       // РёРЅС‚РµСЂРїСЂРµС‚РёСЂСѓРµРј float-РјР°СЃРєСѓ РєР°Рє С†РµР»С‹Рµ
+//                         temp = _mm256_srli_epi32   (temp, 31);  // cРґРІРёРіР°Рµv РєР°Р¶РґС‹Р№ 32-Р±РёС‚РЅС‹Р№ СЌР»РµРјРµРЅС‚ РЅР° 31 Р±РёС‚, РѕСЃС‚Р°РІР»СЏСЏ С‚РѕР»СЊРєРѕ СЃС‚Р°СЂС€РёР№ Р±РёС‚ (0 РёР»Рё 1).
+//                 real_count   = _mm256_add_epi32    (real_count, temp);  // РґР»СЏ С‚РѕС‡РµРє РєРѕС‚РѕСЂС‹Рµ РµС‰Рµ РЅРµ РІС‹С€Р»Рё РґРѕР±Р°РІР»СЏРµРј 1 Рє СЃС‡РµС‚С‡РёРєСѓ
 
 //                 X_N = _mm256_sub_ps (X2, Y2 );
 //                 X_N = _mm256_add_ps (X_N, X0); // (x? - y?) + x0
@@ -382,7 +382,7 @@ void mandelbrot_simd(MandelBrot_t* set)
 //                 Y_N = _mm256_add_ps (Y_N, Y0); // 2xy + y0
 //             }
 
-//             uint32_t* counts = (uint32_t*) (&real_count); // преобразование AVX-регистра в массив
+//             uint32_t* counts = (uint32_t*) (&real_count); // РїСЂРµРѕР±СЂР°Р·РѕРІР°РЅРёРµ AVX-СЂРµРіРёСЃС‚СЂР° РІ РјР°СЃСЃРёРІ
 //                                                           // [count[0], ..., count[7]]
 
 //             for (size_t i = 0; i < VECTOR_SIZE; i++)
@@ -398,7 +398,7 @@ void run_performance_test (MandelBrot_t* set, int mode_measure)
         printf("Error: Calculation function not initialized\n");
         return;
     }
-
+    
     RUN_TEST(set->calculate, mode_measure);
 }
 
@@ -443,23 +443,23 @@ void init_color_palette(MandelBrot_t* set)
     
     for (size_t i = 0; i < MAX_ITERATIONS; i++) 
     {
-        // нормализация значения в диапазон [0, 1]
+        // РЅРѕСЂРјР°Р»РёР·Р°С†РёСЏ Р·РЅР°С‡РµРЅРёСЏ РІ РґРёР°РїР°Р·РѕРЅ [0, 1]
         float normalized = (float)i / (float)MAX_ITERATIONS;
         
-        // используем тригонометрические функции для плавных переходов
+        // РёСЃРїРѕР»СЊР·СѓРµРј С‚СЂРёРіРѕРЅРѕРјРµС‚СЂРёС‡РµСЃРєРёРµ С„СѓРЅРєС†РёРё РґР»СЏ РїР»Р°РІРЅС‹С… РїРµСЂРµС…РѕРґРѕРІ
         float r = sinf(2 * M_PI * normalized * 1.5f + M_PI / 3) * 0.5f + 0.5f;
         float g = sinf(2 * M_PI * normalized * 2.0f + M_PI / 2) * 0.5f + 0.5f;
         float b = sinf(2 * M_PI * normalized * 3.0f + M_PI    ) * 0.5f + 0.5f;
         
-        // преобразуем в цвет формата 0xAARRGGBB
+        // РїСЂРµРѕР±СЂР°Р·СѓРµРј РІ С†РІРµС‚ С„РѕСЂРјР°С‚Р° 0xAARRGGBB
         set->color_palette[i] = 
-            (0xFF << 24) |                       // Альфа-канал
-            ((uint32_t) (r * 255) << 16) |       // Красный
-            ((uint32_t) (g * 255) << 8)  |       // Зеленый
-             (uint32_t) (b * 255);               // Синий
+            (0xFF << 24) |                       // РђР»СЊС„Р°-РєР°РЅР°Р»
+            ((uint32_t) (r * 255) << 16) |       // РљСЂР°СЃРЅС‹Р№
+            ((uint32_t) (g * 255) << 8)  |       // Р—РµР»РµРЅС‹Р№
+             (uint32_t) (b * 255);               // РЎРёРЅРёР№
     }
     
-    // цвет для точек внутри множества (черный)
+    // С†РІРµС‚ РґР»СЏ С‚РѕС‡РµРє РІРЅСѓС‚СЂРё РјРЅРѕР¶РµСЃС‚РІР° (С‡РµСЂРЅС‹Р№)
     set->color_palette[MAX_ITERATIONS-1] = DEFAULT_COLOR;
 }
 
