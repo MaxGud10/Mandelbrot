@@ -5,7 +5,7 @@ void init_mandelbrot (MandelBrot_t* set)
 {
     set->scale        =  INITIAL_SCALE;
     set->x_offset     =  INITIAL_X_OFFSET;
-    set->y_offset     =  INITIAL_Y_OFFSET ;
+    set->y_offset     =  INITIAL_Y_OFFSET;
     set->pixels_array = (uint32_t*) calloc (HEIGHT * WIDTH, sizeof(uint32_t));
 
     init_color_palette(set);
@@ -70,7 +70,7 @@ void get_mandel_brot_set (MandelBrot_t* set)
 }
 
 
-void mandelbrot_naive (MandelBrot_t* set)
+inline void mandelbrot_naive (MandelBrot_t* set)
 {
     const float real_dx = set->scale * D_X;
     // set->scale - масштаб (увеличение/уменьшение)
@@ -106,63 +106,69 @@ void mandelbrot_naive (MandelBrot_t* set)
     }
 }
 
-void mandelbrot_vectorized(MandelBrot_t* set)
+
+
+inline void mandelbrot_vectorized(MandelBrot_t* set)
 {
     const float real_dx = set->scale * D_X;
     const float real_dy = set->scale * D_Y;
+    const float COLOR_SCALE = 255.0f / MAX_ITERATIONS;
 
-    
+    // #pragma omp parallel for schedule(guided, 4)
+    #pragma omp parallel for
     for (size_t y = 0; y < HEIGHT; y++) 
     {
-        const float base_x0 = (-(HALF_WIDTH) * D_X + set->x_offset) * set->scale;
-        const float y0 = (((float)y - HALF_HEIGHT) * D_Y + set->y_offset) * set->scale;
+        const float base_x0 = (-    HALF_WIDTH   * D_X + set->x_offset) * set->scale;
+        const float y0      = ((y - HALF_HEIGHT) * D_Y + set->y_offset) * set->scale;
+
+        ALIGN float X0         [VECTOR_SIZE];
+        ALIGN float X_N        [VECTOR_SIZE];
+        ALIGN float Y_N        [VECTOR_SIZE];
+        ALIGN float X2         [VECTOR_SIZE];
+        ALIGN float Y2         [VECTOR_SIZE];
+        ALIGN float XY         [VECTOR_SIZE];
+        ALIGN int   iterations [VECTOR_SIZE];
 
         for (size_t x = 0; x < WIDTH; x += VECTOR_SIZE) 
         {
-            ALIGN float X0     [VECTOR_SIZE] = {};
-            ALIGN float X_N    [VECTOR_SIZE] = {};
-            ALIGN float Y_N    [VECTOR_SIZE] = {};
-            ALIGN float X2     [VECTOR_SIZE] = {};
-            ALIGN float Y2     [VECTOR_SIZE] = {};
-            ALIGN float XY     [VECTOR_SIZE] = {};
-            ALIGN int   counts [VECTOR_SIZE] = {};
-
-
             FOR_VEC 
             {
                 X0[i] = base_x0 + (x + i) * real_dx;
                 X_N[i] = X0[i];
                 Y_N[i] = y0;
+                iterations[i] = 0;
             }
 
-            int iter = 0;
-            while (iter++ < MAX_ITERATIONS)
+            for (int it = 0; it < MAX_ITERATIONS; it++) 
             {
+                ALIGN float radius2[VECTOR_SIZE];
+                ALIGN int is_active[VECTOR_SIZE];
+                
                 FOR_VEC 
                 {
                     X2[i] = X_N[i] * X_N[i];
                     Y2[i] = Y_N[i] * Y_N[i];
                     XY[i] = X_N[i] * Y_N[i];
+                    radius2[i] = X2[i] + Y2[i];
+                    is_active[i] = radius2[i] < MAX_RADIUS;
                 }
 
-                // проверяем условие |z_n|^2 >= MAX_RADIUS
-                ALIGN int active[VECTOR_SIZE] = {};
                 bool all_inactive = true;
-                
                 FOR_VEC 
                 {
-                    active[i] = (X2[i] + Y2[i] <= MAX_RADIUS);
-                    if (active[i]) all_inactive = false;
+                    if (is_active[i]) 
+                    {
+                        all_inactive = false;
+                        break;
+                    }
                 }
-
                 if (all_inactive) break;
 
-                // обновляем только активные точки
-                FOR_VEC 
+                FOR_VEC
                 {
-                    if (active[i]) 
+                    if (is_active[i]) 
                     {
-                        counts[i]++;
+                        iterations[i]++;
                         X_N[i] = X2[i] - Y2[i] + X0[i];
                         Y_N[i] = XY[i] + XY[i] + y0;
                     }
@@ -172,19 +178,101 @@ void mandelbrot_vectorized(MandelBrot_t* set)
             FOR_VEC 
             {
                 if (x + i < WIDTH) 
-                { 
-                    get_pixels(set, y * WIDTH + x + i, counts[i]);
+                {
+                    size_t idx = y * WIDTH + x + i;
+                    if (iterations[i] < MAX_ITERATIONS) 
+                    {
+                        float iter_norm = iterations[i] * COLOR_SCALE;
+                        set->pixels_array[idx] = 
+                            (0xFF << 24) | 
+                            ((uint32_t)(iter_norm) << 16) |
+                            ((uint32_t)(iter_norm * 0.7) << 8) |
+                            (uint32_t)(iter_norm * 0.3);
+                    } 
+                    else 
+                        set->pixels_array[idx] = DEFAULT_COLOR;
+
                 }
             }
         }
     }
 }
 
-// void mandelbrot_vectorized (MandelBrot_t* set) // [x] версия которая лучше рабоатет с VECTOR_SIZE = 32, но она без выравнивания
+
+// inline void mandelbrot_vectorized(MandelBrot_t* set)
+// {
+//     const float real_dx = set->scale * D_X;
+//     const float real_dy = set->scale * D_Y;
+
+//     ALIGN float X0         [VECTOR_SIZE];
+//     ALIGN float X_N        [VECTOR_SIZE];
+//     ALIGN float Y_N        [VECTOR_SIZE];
+//     ALIGN float X2         [VECTOR_SIZE];
+//     ALIGN float Y2         [VECTOR_SIZE];
+//     ALIGN float XY         [VECTOR_SIZE];
+//     ALIGN int   real_count [VECTOR_SIZE];
+//     ALIGN int   cmp        [VECTOR_SIZE];
+
+//     for (size_t y = 0; y < HEIGHT; y++) 
+//     {
+//         const float base_x0 = (-(HALF_WIDTH) * D_X + set->x_offset) * set->scale;
+//         const float y0 = (((float)y - HALF_HEIGHT) * D_Y + set->y_offset) * set->scale;
+
+//         for (size_t x = 0; x < WIDTH; x += VECTOR_SIZE) 
+//         {
+//             // #pragma omp simd aligned(X0, X_N, Y_N:32)
+//             FOR_VEC 
+//             {
+//                 X0[i] = base_x0 + (x + i) * real_dx;
+//                 X_N[i] = X0[i];
+//                 Y_N[i] = y0;
+//                 real_count[i] = 0;
+//             }
+
+//             int iter = 0;
+//             while (iter++ < MAX_ITERATIONS)
+//             {
+//                 // #pragma omp simd aligned(X_N, Y_N, X2, Y2, XY:32)
+//                 FOR_VEC 
+//                 {
+//                     X2[i] = X_N[i] * X_N[i];
+//                     Y2[i] = Y_N[i] * Y_N[i];
+//                     XY[i] = X_N[i] * Y_N[i];
+//                 }
+
+//                 bool all_inactive = true;
+//                 // #pragma omp simd aligned(X2, Y2, cmp:32) reduction(||:all_inactive)
+//                 FOR_VEC 
+//                 {
+//                     cmp[i] = (X2[i] + Y2[i] <= MAX_RADIUS);
+//                     all_inactive = all_inactive && !cmp[i];
+//                 }
+
+//                 if (all_inactive) break;
+
+//                 // #pragma omp simd aligned(X_N, Y_N, X2, Y2, XY, X0, cmp, real_count:32)
+//                 FOR_VEC 
+//                 {
+//                     real_count[i] += cmp[i];
+//                     X_N[i] = X2[i] - Y2[i] + X0[i];
+//                     Y_N[i] = XY[i] + XY[i] + y0;
+//                 }
+//             }
+
+//             // #pragma omp simd aligned(real_count:32)
+//             for (size_t i = 0; i < VECTOR_SIZE && (x + i) < WIDTH; i++) 
+//             {
+//                 get_pixels(set, y * WIDTH + x + i, real_count[i]);
+//             }
+//         }
+//     }
+// }
+
+
+// inline void mandelbrot_vectorized (MandelBrot_t* set) // [x] версия которая лучше рабоатет с VECTOR_SIZE = 32, но она без выравнивания
 // {
 //     const float real_dx = set->scale * D_X;
 
-//     #pragma omp parallel for schedule(guided, 8)
 //     for (size_t y = 0; y < HEIGHT; y++) 
 //     {
 //         float x0 = (-(HALF_WIDTH)            * D_X + set->x_offset) * set->scale;
@@ -252,7 +340,8 @@ void mandelbrot_vectorized(MandelBrot_t* set)
 // останавливать fps э
 // [x]-S - флаг который генерит asm файл (o0 and 03)
 
-void mandelbrot_simd(MandelBrot_t* set)
+
+inline void mandelbrot_simd(MandelBrot_t* set)
 {
     const int SIMD_WIDTH = 8; 
     float real_dx = D_X * set->scale;
@@ -260,8 +349,9 @@ void mandelbrot_simd(MandelBrot_t* set)
     __m256 MaxRadius = _mm256_set1_ps (MAX_RADIUS);
     
     // #pragma omp parallel for schedule(dynamic)
-    // #pragma omp parallel for schedule(dynamic, 8)
-    #pragma omp parallel for schedule(guided, 8)
+    #pragma omp parallel for schedule(dynamic, 8)
+    // #pragma omp parallel for schedule(guided, 8)
+    // #pragma omp parallel for
     for (size_t y = 0; y < HEIGHT; y++)
     {
         float base_x0 = (-(HALF_WIDTH           ) * D_X + set->x_offset) * set->scale;
@@ -274,12 +364,12 @@ void mandelbrot_simd(MandelBrot_t* set)
                 size_t remaining = (chunk + SIMD_WIDTH > VECTOR_SIZE) ? 
                                     VECTOR_SIZE - chunk : SIMD_WIDTH;
                 
-                float x0[SIMD_WIDTH] __attribute__((aligned(32)));
+                float x0[SIMD_WIDTH] __attribute__((aligned(32))) = {};
 
                 for (size_t i = 0; i < remaining; i++) 
                 {
                     x0[i] = base_x0 + (x + chunk + i) * real_dx;
-                }
+                }   
 
                 for (size_t i = remaining; i < SIMD_WIDTH; i++) 
                 {
@@ -305,7 +395,7 @@ void mandelbrot_simd(MandelBrot_t* set)
                     __m256 mask = _mm256_cmp_ps(R2, MaxRadius, _CMP_LE_OS);
                     if (_mm256_testz_ps(mask, mask)) break;
 
-                    __m256i cmp_result = _mm256_castps_si256 (mask);
+                    __m256i cmp_result = _mm256_castps_si256 (mask); // float ? int
                             cmp_result = _mm256_srli_epi32   (cmp_result, 31);
                             real_count = _mm256_add_epi32    (real_count, cmp_result);
 
@@ -326,7 +416,7 @@ void mandelbrot_simd(MandelBrot_t* set)
                 }
             }
         }
-    }
+    } 
 }
 
 //TODO: VECTOR_SIZE for 2 Array version ONLY. For SIMD create another constant = 8

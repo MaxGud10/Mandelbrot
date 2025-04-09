@@ -41,7 +41,7 @@
 
 #define FOR_VEC for (size_t i = 0; i < VECTOR_SIZE; ++i)
 #define ALIGN alignas(32)  // 32 байта для AVX
-#define ALIGNMENT 32 
+
 
 //=== Rendering constants ===//
 const int    MAX_ITERATIONS = 256;               // максимальное число итераций для фрактала
@@ -105,15 +105,8 @@ void        run_performance_test  (MandelBrot_t* set, int mode_measure);
 void        get_mandel_brot_set   (MandelBrot_t* set);
 void        get_pixels            (MandelBrot_t* set, size_t index, size_t count);
 void        get_fps               (sf::Clock &clock, sf::Text &text, MandelBrot_t* set);
-void init_color_palette           (MandelBrot_t* set);
+void        init_color_palette    (MandelBrot_t* set);
 
 
 // TODO исправить русский -> gitatrid.
-// TODO разделить на файлы
 
-
-
-
-
-
-// TODO ПОДУМАТЬ ЧТО ХЕРНЯ С SFML. ПОЧЕМУ ОНА ТАК МЕДЛЕННО ОБРАБАТЫВАЕМ НАЖАТИЕ КНОПОК 
