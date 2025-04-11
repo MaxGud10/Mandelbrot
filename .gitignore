@@ -4,3 +4,4 @@ src/mandelbrot_utils.cpp
 mandle.exe
 *.exe
 obj/
+*/obj/
